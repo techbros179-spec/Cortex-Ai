@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cortex</title>
+<style>
+:root{
+  --bg-main:#343541;
+  --bg-sidebar:#202123;
+  --bg-input:#40414f;
+  --bg-user:#056162;
+  --bg-bot:#444654;
+  --text-color:#fff;
+  --accent:#19c37d;
+}
+body.light{
+  --bg-main:#f5f5f5;
+  --bg-sidebar:#eaeaea;
+  --bg-input:#fff;
+  --bg-user:#d1f5d3;
+  --bg-bot:#e1e1e1;
+  --text-color:#000;
+  --accent:#10a37f;
+}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  height:100vh;
+  background:var(--bg-main);
+  color:var(--text-color);
+  transition:background 0.3s,color 0.3s;
+  overflow:hidden;
+}
+
+/* Sidebar */
+#sidebar {
+  width:250px;
+  position:fixed;
+  top:0;
+  left:-250px;
+  height:100%;
+  background: var(--bg-sidebar);
+  padding:0px;
+  display:flex;
+  flex-direction:column;
+  border-right:1px solid #444;
+  transition:left 0.3s ease;
+  z-index:1000;
+}
+#sidebar.active { left:0; }
+#chatList{flex:1;overflow-y:auto;}
+.chat-item{
+  padding:10px;
+  margin-bottom:5px;
+  background:#2a2b32;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+  color:#ddd;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.chat-item:hover{background:#3a3b42;}
+button{margin-top:10px;padding:10px;border:none;border-radius:6px;cursor:pointer;background:var(--accent);color:#fff;font-weight:bold;}
+
+/* Overlay */
+#overlay{
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.2);
+  display:none; z-index:900;
+}
+#overlay.active{display:block;}
+
+/* Main chat */
+#main{
+  position:absolute;
+  top:0; left:0; right:0; bottom:0;
+  display:flex;
+  flex-direction:column;
+}
+.theme-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.theme-btn:hover { background: rgba(0,0,0,0.1);}
+#resetHistoryBtn {margin: 10px;padding: 10px;border: none;border-radius: 6px;background: #dc2626;color: #fff;cursor: pointer;font-weight: bold;transition: background 0.2s;}
+#resetHistoryBtn:hover {background: #b91c1c;}
+.theme-btn svg { width:16px;height:16px;pointer-events:none; }
+
+#topbar{background:#1e293b;padding:0.8rem;display:flex;align-items:center;z-index:500;}
+#hamburger{font-size:24px;cursor:pointer;margin-right:10px;}
+#chat{flex:1;padding:1rem;overflow-y:auto;display:flex;flex-direction:column;}
+.message{max-width:80%;margin:0.5rem 0;padding:0.8rem;border-radius:10px;word-wrap:break-word;}
+.user{background:#2563eb;align-self:flex-end;}
+.bot{background:#334155;align-self:flex-start;position:relative;}
+.typing-dots{display:flex;gap:5px;margin:5px;}
+.dot{width:10px;height:10px;border-radius:50%;background:#38bdf8;animation:bounce 1s infinite;}
+.dot:nth-child(2){animation-delay:0.2s;}
+.dot:nth-child(3){animation-delay:0.4s;}
+@keyframes bounce{0%,80%,100%{transform:scale(0.6);}40%{transform:scale(1);}}
+
+#input-area{display:flex;padding:0.8rem;background:#1e293b;}
+#userInput{flex:1;padding:0.6rem;border:none;border-radius:8px;outline:none;color:var(--text-color);background:var(--bg-input);}
+#sendBtn,#stopBtn{margin-left:0.5rem;padding:0.6rem 1rem;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;}
+#sendBtn{background:#22c55e;color:white;}
+#stopBtn{background:#16a34a;color:white;}
+
+/* Welcome box */
+.welcome-box{
+  margin:auto;
+  text-align:center;
+  color:var(--text-color);
+  max-width:600px;
+}
+.welcome-title{
+  font-size:1.5rem;
+  font-weight:bold;
+  margin-bottom:1rem;
+}
+.suggestions{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+  gap:10px;
+  margin-top:1rem;
+}
+.suggestion{
+  background:var(--bg-input);
+  padding:10px;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:14px;
+  transition:background 0.2s;
+}
+.suggestion:hover{background:var(--accent);color:#fff;}
+</style>
+</head>
+<body>
+
+<div id="overlay"></div>
+<div id="sidebar">
+<h2>Cortex</h2>
+<div id="chatList"></div>
+<button id="newChatBtn">➕ New Chat</button>
+<button id="toggleTheme" class="theme-btn">
+  <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="yellow">
+    <path d="M9 21h6v-1H9v1zm3-19a6 6 0 00-6 6c0 2.21 1.19 4.15 2.93 5.21L10 14v2h4v-2l1.07-0.79A6.003 6.003 0 0018 8a6 6 0 00-6-6z"/>
+  </svg>
+</button>
+<button id="resetHistoryBtn">Reset History</button>
+</div>
+
+<div id="main">
+<div id="topbar">
+<span id="hamburger">☰</span>
+<strong>Cortex</strong>
+</div>
+<div id="chat"></div>
+<div id="input-area">
+<input type="text" id="userInput" placeholder="Type a message...">
+<button id="sendBtn">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="white">
+<path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+</svg>
+</button>
+<button id="stopBtn">⏹️</button>
+</div>
+</div>
+
+<script>
+const API_KEY="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";
+const MODEL="gpt-4o-mini";
+
+const sidebar=document.getElementById("sidebar");
+const overlay=document.getElementById("overlay");
+const hamburger=document.getElementById("hamburger");
+const chat=document.getElementById("chat");
+const userInput=document.getElementById("userInput");
+const sendBtn=document.getElementById("sendBtn");
+const stopBtn=document.getElementById("stopBtn");
+const newChatBtn=document.getElementById("newChatBtn");
+const toggleTheme=document.getElementById("toggleTheme");
+const chatList=document.getElementById("chatList");
+
+let conversation=[];
+let currentFullText="";
+let currentBotDiv=null;
+let isTyping=false;
+let isGenerating=false;
+let chats=JSON.parse(localStorage.getItem("savedChats")||"[]");
+
+let userName = null;
+function setUserName(name) { userName = name.trim(); }
+function getUserName() { return userName || "User"; }
+
+function renderChatList(){
+  chatList.innerHTML="";
+  chats.forEach((c,i)=>{
+    const div=document.createElement("div");
+    div.className="chat-item";
+    div.textContent=c.title||"Untitled";
+    div.addEventListener("click",()=>{
+      conversation=c.messages.slice();
+      renderConversation();
+      sidebar.classList.remove("active");
+      overlay.classList.remove("active");
+    });
+    chatList.appendChild(div);
+  });
+}
+renderChatList();
+
+function renderConversation(){
+  chat.innerHTML="";
+  conversation.forEach(msg=>appendMessage(msg.role,msg.content));
+}
+
+hamburger.addEventListener("click",()=>{
+  sidebar.classList.toggle("active");
+  overlay.classList.toggle("active");
+});
+overlay.addEventListener("click",()=>{
+  sidebar.classList.remove("active");
+  overlay.classList.remove("active");
+});
+
+function appendMessage(role,content="",dots=false){
+  const div=document.createElement("div");
+  div.className="message "+role;
+  if(dots){
+    const dotsDiv=document.createElement("div");
+    dotsDiv.className="typing-dots";
+    dotsDiv.innerHTML='<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+    div.appendChild(dotsDiv);
+  }else{
+    div.textContent=content;
+  }
+  chat.appendChild(div);
+  chat.scrollTop=chat.scrollHeight;
+  return div;
+}
+
+function typeWriter(element,text){
+  clearInterval(window.typingInterval);
+  element.textContent="";
+  let i=0;
+  currentFullText=text;
+  currentBotDiv=element;
+  isTyping=true;
+  window.typingInterval=setInterval(()=>{
+    element.textContent+=text[i++];
+    chat.scrollTop=chat.scrollHeight;
+    if(i>=text.length){clearInterval(window.typingInterval);isTyping=false;}
+  },18);
+}
+
+function hideWelcomeBox() {
+  const welcomeBox = document.querySelector(".welcome-box");
+  if (welcomeBox) welcomeBox.remove();
+}
+
+async function sendMessage(){
+  if(conversation.length>=200){
+    appendMessage("bot","⚠️ Conversation limit reached. Tap 'New Chat'.");
+    return;
+  }
+  const text=userInput.value.trim();
+  if(!text) return;
+
+  // ✅ Hide welcome box once user types/sends a message
+  hideWelcomeBox();
+
+  const nameMatch = text.match(/my name is (\w+)/i);
+  if(nameMatch){
+    setUserName(nameMatch[1]);
+    appendMessage("bot", `Nice to meet you, ${getUserName()}!`);
+    userInput.value="";
+    return;
+  }
+
+  appendMessage("user",text);
+  conversation.push({role:"user",content:text});
+  userInput.value="";
+  const botDiv=appendMessage("bot","",true);
+  isGenerating=true;
+
+  try{
+    const recentMessages=conversation.slice(-30);
+    const data=await fetch("https://api.openai.com/v1/chat/completions",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":`Bearer ${API_KEY}`
+      },
+      body:JSON.stringify({model:MODEL,messages:recentMessages})
+    }).then(r=>r.json());
+
+    botDiv.innerHTML="";
+    let botText=data.choices[0].message.content;
+    botText = botText.replace(/\bUser\b/g,getUserName());
+    conversation.push({role:"assistant",content:botText});
+    typeWriter(botDiv,botText);
+  }catch(err){
+    console.error(err);
+    botDiv.innerHTML="⚠️ Oops, I couldn’t respond. Please try again.";
+  }finally{isGenerating=false;}
+}
+
+stopBtn.addEventListener("click",()=>{
+  if(isTyping && currentBotDiv){
+    clearInterval(window.typingInterval);
+    currentBotDiv.textContent=currentFullText;
+    isTyping=false;
+  }
+  isGenerating=false;
+});
+
+newChatBtn.addEventListener("click",()=>{
+  if(conversation.length>0){
+    chats.push({title:conversation[0].content||"Untitled",messages:conversation});
+    localStorage.setItem("savedChats",JSON.stringify(chats));
+    renderChatList();
+  }
+  conversation=[];
+  chat.innerHTML="";
+  showWelcomeBox();
+});
+
+document.getElementById('resetHistoryBtn').addEventListener('click', () => {
+  if (confirm("Are you sure you want to reset all chat history?")) {
+    localStorage.removeItem('savedChats');
+    conversation=[];
+    chat.innerHTML="";
+    chats=[];
+    renderChatList();
+    showWelcomeBox();
+  }
+});
+
+toggleTheme.addEventListener("click",()=>document.body.classList.toggle("light"));
+userInput.addEventListener("keypress",e=>{if(e.key==="Enter") sendMessage();});
+sendBtn.addEventListener("click",sendMessage);
+
+// ✅ DeepSeek-style welcome
+function showWelcomeBox(){
+  chat.innerHTML=`
+    <div class="welcome-box">
+      <div class="welcome-title">👋 Hi I'm Cortex, Ask me anything!</div>
+      <div class="suggestions">
+        <div class="suggestion">✨ Write me a short story</div>
+        <div class="suggestion">📘 Summarize this text</div>
+        <div class="suggestion">💻 Explain this code</div>
+        <div class="suggestion">🌍 Translate a sentence</div>
+        <div class="suggestion">🧮 Solve a math problem</div>
+      </div>
+    </div>
+  `;
+  document.querySelectorAll(".suggestion").forEach(s=>{
+    s.addEventListener("click",()=>{
+      hideWelcomeBox();   // ✅ Hide welcome box on card click
+      userInput.value=s.textContent;
+      sendMessage();
+    });
+  });
+}
+showWelcomeBox();
+</script>
+</body>
+</html>
